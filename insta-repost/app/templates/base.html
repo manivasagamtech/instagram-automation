@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Meme Repost Bot{% endblock %}</title>
+  <style>
+    /* ── Reset & base ──────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:       #0f172a;
+      --surface:  #1e293b;
+      --border:   #334155;
+      --text:     #f1f5f9;
+      --muted:    #94a3b8;
+      --accent:   #6366f1;
+      --accent-h: #818cf8;
+      --success:  #10b981;
+      --warn:     #f59e0b;
+      --danger:   #ef4444;
+      --info:     #3b82f6;
+      --radius:   0.5rem;
+    }
+    html { font-size: 16px; }
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 0;
+    }
+
+    /* ── Layout ────────────────────────────────────────────────────── */
+    .wrapper {
+      max-width: 620px;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+
+    /* ── Nav ───────────────────────────────────────────────────────── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: .75rem 1rem;
+    }
+    nav .inner {
+      max-width: 620px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      gap: 1.25rem;
+    }
+    nav .brand {
+      font-weight: 700;
+      font-size: 1rem;
+      color: var(--accent-h);
+      text-decoration: none;
+      margin-right: auto;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: .9rem;
+      padding: .35rem .6rem;
+      border-radius: var(--radius);
+      transition: background .15s;
+    }
+    nav a:hover { background: var(--border); color: var(--text); }
+
+    /* ── Card ──────────────────────────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-top: 1.25rem;
+    }
+    .card h1, .card h2 {
+      font-size: 1.2rem;
+      margin-bottom: 1rem;
+      color: var(--text);
+    }
+
+    /* ── Forms ─────────────────────────────────────────────────────── */
+    label {
+      display: block;
+      font-size: .85rem;
+      color: var(--muted);
+      margin-bottom: .35rem;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="url"],
+    textarea {
+      width: 100%;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: 1rem;
+      padding: .65rem .85rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus, textarea:focus { border-color: var(--accent); }
+    textarea { resize: vertical; min-height: 120px; font-family: inherit; }
+
+    /* ── Buttons ───────────────────────────────────────────────────── */
+    .btn {
+      display: inline-block;
+      padding: .7rem 1.4rem;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+      text-align: center;
+      min-height: 44px;         /* accessible tap target */
+      transition: opacity .15s;
+    }
+    .btn:hover { opacity: .85; }
+    .btn-primary  { background: var(--accent);  color: #fff; }
+    .btn-success  { background: var(--success); color: #fff; }
+    .btn-danger   { background: var(--danger);  color: #fff; }
+    .btn-info     { background: var(--info);    color: #fff; }
+    .btn-ghost    { background: transparent; border: 1px solid var(--border); color: var(--muted); }
+    .btn-sm       { padding: .4rem .8rem; font-size: .8rem; min-height: 36px; }
+    .btn-block    { display: block; width: 100%; }
+
+    /* ── Flash messages ─────────────────────────────────────────────── */
+    .flash-list   { list-style: none; margin-top: .75rem; }
+    .flash {
+      padding: .75rem 1rem;
+      border-radius: var(--radius);
+      font-size: .9rem;
+      margin-bottom: .5rem;
+      border-left: 4px solid transparent;
+    }
+    .flash.success { background: #052e16; border-color: var(--success); color: #bbf7d0; }
+    .flash.error   { background: #450a0a; border-color: var(--danger);  color: #fecaca; }
+    .flash.info    { background: #172554; border-color: var(--info);    color: #bfdbfe; }
+    .flash.warning { background: #422006; border-color: var(--warn);    color: #fde68a; }
+
+    /* ── Table ──────────────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: .85rem;
+    }
+    th {
+      background: var(--bg);
+      color: var(--muted);
+      text-align: left;
+      padding: .5rem .75rem;
+      border-bottom: 1px solid var(--border);
+      font-weight: 600;
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+    td {
+      padding: .55rem .75rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: middle;
+    }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: rgba(255,255,255,.02); }
+
+    /* ── Misc ───────────────────────────────────────────────────────── */
+    .mt-1 { margin-top: .5rem; }
+    .mt-2 { margin-top: 1rem; }
+    .mt-3 { margin-top: 1.5rem; }
+    .gap-1 { display: flex; gap: .5rem; flex-wrap: wrap; }
+    .text-muted { color: var(--muted); font-size: .85rem; }
+    .mono { font-family: monospace; }
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 9999px;
+      font-size: .72rem;
+      font-weight: 600;
+    }
+    .media-preview {
+      max-width: 100%;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      margin-top: .75rem;
+      background: #000;
+    }
+
+    /* ── Spinner (for long submit) ──────────────────────────────────── */
+    .spinner {
+      display: none;
+      width: 1.1em; height: 1.1em;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      vertical-align: middle;
+      margin-right: .4em;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+
+{% if session.get('authenticated') %}
+<nav>
+  <div class="inner">
+    <a class="brand" href="{{ url_for('index') }}">🤖 Meme Bot</a>
+    <a href="{{ url_for('submit') }}">Submit</a>
+    <a href="{{ url_for('queue') }}">Queue</a>
+    <a href="{{ url_for('logout') }}">Logout</a>
+  </div>
+</nav>
+{% endif %}
+
+<div class="wrapper">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <ul class="flash-list">
+        {% for category, message in messages %}
+          <li class="flash {{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</div>
+
+</body>
+</html>

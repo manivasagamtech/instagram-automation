@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Preview — Meme Bot{% endblock %}
+
+{% block content %}
+<div class="card">
+  <h1>👀 Review Before Queueing</h1>
+  <p class="text-muted mt-1">
+    Edit the caption below, then click <strong>Queue it</strong>.
+    The post will be added with <em>status&nbsp;=&nbsp;pending</em>; you'll
+    approve it on the Queue page when ready to publish.
+  </p>
+</div>
+
+<!-- Media preview -->
+<div class="card mt-2">
+  <h2>📸 Media</h2>
+  <p class="text-muted" style="font-size:.8rem;">
+    Shortcode: <span class="mono">{{ pending.shortcode }}</span> &nbsp;|&nbsp;
+    Type: {{ pending.media_type }}
+    {% if pending.is_carousel %}<span class="badge" style="background:var(--warn);color:#000;">Carousel (first slide only)</span>{% endif %}
+  </p>
+
+  {% if pending.media_type == "VIDEO" %}
+    <video
+      class="media-preview"
+      src="{{ url_for('preview_media', shortcode=pending.shortcode) }}"
+      controls
+      muted
+      playsinline
+      style="max-height:340px;"
+    ></video>
+  {% else %}
+    <img
+      class="media-preview"
+      src="{{ url_for('preview_media', shortcode=pending.shortcode) }}"
+      alt="Downloaded media"
+      style="max-height:400px;object-fit:contain;"
+    >
+  {% endif %}
+
+  {% if pending.source_user %}
+    <p class="text-muted mt-1" style="font-size:.8rem;">
+      Original creator: <strong>@{{ pending.source_user }}</strong>
+    </p>
+  {% endif %}
+</div>
+
+<!-- Caption editor -->
+<div class="card mt-2">
+  <h2>✏️ Caption</h2>
+
+  <form method="post" action="{{ url_for('submit_confirm') }}">
+    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+
+    <label for="caption">
+      Final caption
+      <span class="text-muted" style="font-weight:400;">
+        — credit line pre-filled, edit freely
+      </span>
+    </label>
+    <textarea
+      id="caption"
+      name="caption"
+      rows="8"
+      maxlength="2200"
+      autocomplete="off"
+    >{{ pending.default_caption }}</textarea>
+
+    <p class="text-muted mt-1" style="font-size:.8rem;">
+      Instagram limit: 2 200 characters. We pre-trim at 2 000.
+    </p>
+
+    <div class="gap-1 mt-2">
+      <button type="submit" class="btn btn-success">✅ Queue it</button>
+      <a href="{{ url_for('submit') }}" class="btn btn-ghost">← Discard &amp; go back</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

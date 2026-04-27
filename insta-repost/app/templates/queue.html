@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Queue — Meme Bot{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap;">
+    <h1 style="margin:0;">📋 Post Queue</h1>
+    <a href="{{ url_for('submit') }}" class="btn btn-primary btn-sm" style="margin-left:auto;">
+      + Add post
+    </a>
+  </div>
+
+  {% if not rows %}
+    <p class="text-muted mt-2">The queue is empty. <a href="{{ url_for('submit') }}">Add the first post.</a></p>
+  {% else %}
+    <!-- Summary counts -->
+    {% set counts = {} %}
+    {% for row in rows %}
+      {% if row.status not in counts %}{% set _ = counts.update({row.status: 0}) %}{% endif %}
+      {% set _ = counts.update({row.status: counts[row.status] + 1}) %}
+    {% endfor %}
+    <div class="gap-1 mt-2" style="font-size:.82rem;color:var(--muted);">
+      <span>Total: <strong style="color:var(--text);">{{ rows|length }}</strong></span>
+      {% for st, cnt in counts.items() %}
+        &nbsp;·&nbsp;{{ st }}: <strong style="color:var(--text);">{{ cnt }}</strong>
+      {% endfor %}
+    </div>
+
+    <div class="table-wrap mt-2">
+      <table>
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Shortcode</th>
+            <th>Type</th>
+            <th>Source</th>
+            <th>Status</th>
+            <th>Created</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+          <tr>
+            <td class="mono text-muted">{{ row.row_index }}</td>
+            <td>
+              <a
+                href="https://www.instagram.com/p/{{ row.shortcode }}/"
+                target="_blank"
+                rel="noopener"
+                class="mono"
+                style="color:var(--accent-h);text-decoration:none;"
+              >{{ row.shortcode }}</a>
+            </td>
+            <td class="text-muted">{{ row.media_type or "—" }}</td>
+            <td class="text-muted">
+              {% if row.source_user %}@{{ row.source_user }}{% else %}—{% endif %}
+            </td>
+            <td>{{ status_badge(row.status)|safe }}</td>
+            <td class="text-muted" style="white-space:nowrap;font-size:.78rem;">
+              {{ row.created_at[:10] if row.created_at else "—" }}
+            </td>
+            <td>
+              <div class="gap-1">
+                {% if row.status in ("pending", "error", "rejected") %}
+                  <form method="post" action="{{ url_for('queue_approve', row=row.row_index) }}" style="display:inline;">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-info btn-sm" title="Approve — mark ready">✔ Ready</button>
+                  </form>
+                {% endif %}
+                {% if row.status in ("pending", "ready") %}
+                  <form method="post" action="{{ url_for('queue_reject', row=row.row_index) }}" style="display:inline;"
+                        onsubmit="return confirm('Reject row {{ row.row_index }}?')">
+                    <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+                    <button type="submit" class="btn btn-danger btn-sm" title="Reject">✖ Reject</button>
+                  </form>
+                {% endif %}
+                {% if row.status == "posted" and row.post_id %}
+                  <a
+                    href="https://www.instagram.com/p/{{ row.shortcode }}/"
+                    target="_blank" rel="noopener"
+                    class="btn btn-ghost btn-sm"
+                  >View ↗</a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+
+<!-- Caption peek on hover (detail card) -->
+<div class="card mt-2">
+  <h2>📝 Caption Preview</h2>
+  <p class="text-muted" style="font-size:.85rem;">
+    Click a shortcode in the table above to open the post on Instagram.
+    Captions are stored in the sheet; the scheduler publishes the row when
+    it is marked <strong>ready</strong>.
+  </p>
+</div>
+{% endblock %}
