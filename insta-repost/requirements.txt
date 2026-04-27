@@ -1,0 +1,26 @@
+# Web framework
+flask==3.1.0
+gunicorn==23.0.0
+
+# Instagram downloaders
+instaloader==4.13.1
+yt-dlp==2025.3.31
+
+# HTTP
+requests==2.32.3
+
+# Google Sheets queue
+gspread==6.1.4
+google-auth==2.38.0
+
+# Scheduler
+APScheduler==3.11.0
+
+# Env & config
+python-dotenv==1.1.0
+
+# Image handling
+Pillow==11.1.0
+
+# Password hashing / security
+werkzeug==3.1.3
