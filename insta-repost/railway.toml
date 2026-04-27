@@ -1,0 +1,19 @@
+# railway.toml — Railway deployment configuration
+# Docs: https://docs.railway.app/reference/config-as-code
+
+[build]
+# Use the Dockerfile in this directory for all builds.
+builder = "dockerfile"
+
+[deploy]
+# Railway polls this path to decide whether the container is healthy.
+# Returns HTTP 200 when Flask is up; Railway marks the deploy as failed
+# if it doesn't respond within healthcheckTimeout seconds.
+healthcheckPath    = "/healthz"
+healthcheckTimeout = 60
+
+# Restart the container automatically on non-zero exit codes.
+# After 3 consecutive failures Railway stops retrying and surfaces
+# the error in the dashboard.
+restartPolicyType       = "on_failure"
+restartPolicyMaxRetries = 3

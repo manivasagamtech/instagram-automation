@@ -1,0 +1,53 @@
+# ── Secrets — never bake credentials into the image ───────────────────────────
+.env
+SECRETS.md
+gcreds.json
+*.json
+
+# ── Git internals ──────────────────────────────────────────────────────────────
+.git
+.gitignore
+.gitattributes
+
+# ── Tests and CI — not needed at runtime ──────────────────────────────────────
+tests/
+.pytest_cache/
+pytest.ini
+setup.cfg
+tox.ini
+
+# ── Python bytecode ───────────────────────────────────────────────────────────
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+venv/
+.venv/
+env/
+.env/
+ENV/
+
+# ── instaloader session cache — rebuilt at runtime ────────────────────────────
+sessions/
+*.session
+*.session-*
+
+# ── Downloaded media scratch space — rebuilt at runtime ───────────────────────
+downloads/
+
+# ── Docs and config not needed in the container ───────────────────────────────
+README.md
+.env.example
+railway.toml
+Procfile
+
+# ── OS / editor noise ─────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo

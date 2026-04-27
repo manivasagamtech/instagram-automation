@@ -1,8 +1,9 @@
 # Railway / Heroku Procfile
 #
-# Single worker is REQUIRED — the APScheduler BackgroundScheduler runs
-# inside the Gunicorn worker process.  Multiple workers → duplicate jobs
-# → double-posting.  Scale vertically (--threads) not horizontally (--workers).
+# ⚠️  --workers 1 is REQUIRED.
+#     The APScheduler BackgroundScheduler lives inside the Gunicorn worker
+#     process.  Multiple workers → duplicate scheduler instances → double-posting.
+#     Scale vertically with --threads, not horizontally with --workers.
 #
-# Railway injects $PORT automatically (default 8080 if unset).
-web: gunicorn main:application --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --access-logfile - --error-logfile -
+# Railway injects $PORT automatically (falls back to 8080 if unset).
+web: gunicorn --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --access-logfile - --error-logfile - main:app
