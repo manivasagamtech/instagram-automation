@@ -355,6 +355,34 @@ def create_app(cfg=None) -> Flask:
     def healthz():
         return "ok", 200
 
+    # ── TEMPORARY: smoke-test trigger ──────────────────────────────────────────
+    # POST /admin/publish-now?key=<APP_PASSWORD>
+    # Forces one publish_next() cycle immediately without waiting for the
+    # scheduler tick.  Protected by APP_PASSWORD in the query string.
+    # ⚠️  REMOVE THIS ROUTE after Phase 10 smoke test is complete.
+
+    @app.route("/admin/publish-now", methods=["POST"])
+    def admin_publish_now():
+        import json
+        from app.publisher import publish_next
+        from app.queue_client import QueueClient
+
+        key = request.args.get("key", "")
+        expected = app.config["APP_PASSWORD"]
+        if not secrets.compare_digest(key, expected):
+            return json.dumps({"error": "forbidden"}), 403, {"Content-Type": "application/json"}
+
+        inner_cfg = app.config["BOT_CONFIG"]
+        try:
+            qc = QueueClient(inner_cfg.google_credentials, inner_cfg.google_sheet_name)
+            post_id = publish_next(inner_cfg, qc)
+        except Exception as exc:
+            return json.dumps({"error": str(exc)}), 500, {"Content-Type": "application/json"}
+
+        if post_id:
+            return json.dumps({"published": post_id}), 200, {"Content-Type": "application/json"}
+        return json.dumps({"published": None, "reason": "window/cap/empty"}), 200, {"Content-Type": "application/json"}
+
     return app
 
 
