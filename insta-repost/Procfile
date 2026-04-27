@@ -1,2 +1,8 @@
-# Procfile — placeholder for Phase 6 (Railway / Heroku-style deployment)
-# web: gunicorn "app.web:create_app()" --bind 0.0.0.0:$PORT --workers 1
+# Railway / Heroku Procfile
+#
+# Single worker is REQUIRED — the APScheduler BackgroundScheduler runs
+# inside the Gunicorn worker process.  Multiple workers → duplicate jobs
+# → double-posting.  Scale vertically (--threads) not horizontally (--workers).
+#
+# Railway injects $PORT automatically (default 8080 if unset).
+web: gunicorn main:application --bind 0.0.0.0:$PORT --workers 1 --threads 4 --timeout 120 --access-logfile - --error-logfile -
