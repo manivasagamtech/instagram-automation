@@ -44,6 +44,10 @@ POLL_INTERVAL     = 10                  # seconds between container status polls
 POLL_MAX_WAIT     = 300                 # 5 minutes total polling budget
 DAILY_CAP_HARD    = 20                  # absolute ceiling regardless of config
 
+# Instagram Login tokens (IGAAZ…) are refreshed via graph.instagram.com,
+# not graph.facebook.com.  Facebook Login tokens (EAA…) use GRAPH_API_BASE.
+INSTAGRAM_REFRESH_BASE = "https://graph.instagram.com"
+
 
 # ── Exceptions ─────────────────────────────────────────────────────────────────
 
@@ -149,10 +153,17 @@ def refresh_access_token(cfg) -> str:
     Raises:
         PublisherError: If the Graph API returns an error.
     """
-    url = f"{GRAPH_API_BASE}/refresh_access_token"
+    # IGAAZ tokens (Instagram Login) → graph.instagram.com
+    # EAA   tokens (Facebook Login)  → graph.facebook.com
+    token = cfg.ig_access_token
+    if token.startswith("IGAAZ") or token.startswith("IGAA"):
+        base = INSTAGRAM_REFRESH_BASE
+    else:
+        base = GRAPH_API_BASE
+    url = f"{base}/refresh_access_token"
     params = {
         "grant_type":   "ig_refresh_token",
-        "access_token": cfg.ig_access_token,
+        "access_token": token,
     }
 
     log.info("Requesting access-token refresh …")
