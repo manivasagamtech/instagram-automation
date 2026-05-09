@@ -168,7 +168,8 @@ def create_app(cfg=None) -> Flask:
     @app.route("/submit", methods=["GET"])
     @_require_auth
     def submit():
-        return render_template("submit.html")
+        pending = session.get("pending")
+        return render_template("submit.html", pending=pending)
 
     @app.route("/submit", methods=["POST"])
     @_require_auth
@@ -237,8 +238,8 @@ def create_app(cfg=None) -> Flask:
             flash("Download returned no result. Please try again.", "error")
             return redirect(url_for("submit"))
 
-        credit = f"\n\n🎥 Credits: @{result.source_user}" if result.source_user else ""
-        default_caption = result.caption + credit
+        credit_user = result.source_user or "the creator"
+        default_caption = f"Credits: @{credit_user}"
 
         # Store pending download in session (JSON-safe strings)
         session["pending"] = {
@@ -252,10 +253,10 @@ def create_app(cfg=None) -> Flask:
         }
 
         log.info(
-            "Download complete for %s (%s) — showing preview",
+            "Download complete for %s (%s) — showing on submit page",
             result.shortcode, result.media_type,
         )
-        return redirect(url_for("submit_preview"))
+        return redirect(url_for("submit"))
 
     @app.route("/submit/preview", methods=["GET"])
     @_require_auth
