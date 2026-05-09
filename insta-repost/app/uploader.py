@@ -29,8 +29,14 @@ log = get_logger(__name__)
 
 # ── Constants ──────────────────────────────────────────────────────────────────
 
-CATBOX_API_URL  = "https://catbox.moe/user/api.php"
-ZX0_API_URL     = "https://0x0.st"
+CATBOX_API_URL      = "https://catbox.moe/user/api.php"
+LITTERBOX_API_URL   = "https://litterbox.catbox.moe/resources/internals/api.php"
+ZX0_API_URL         = "https://0x0.st"
+
+# Common headers to avoid being blocked as a bot
+_UPLOAD_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) MemeBot/1.0",
+}
 
 MAX_FILE_SIZE_BYTES = 200 * 1024 * 1024   # 200 MB — Instagram's practical limit
 
@@ -91,6 +97,7 @@ def upload_to_catbox(file_path: Path, retries: int = 3) -> str:
                     CATBOX_API_URL,
                     data={"reqtype": "fileupload"},
                     files={"fileToUpload": (path.name, fh)},
+                    headers=_UPLOAD_HEADERS,
                     timeout=_UPLOAD_TIMEOUT,
                 )
 
@@ -146,7 +153,14 @@ def upload_with_fallback(file_path: Path) -> str:
         return upload_to_catbox(path)
     except UploadError as catbox_exc:
         log.warning(
-            "Catbox failed (%s) — attempting 0x0.st fallback …", catbox_exc
+            "Catbox failed (%s) — attempting Litterbox fallback …", catbox_exc
+        )
+
+    try:
+        return _upload_to_litterbox(path)
+    except UploadError as litter_exc:
+        log.warning(
+            "Litterbox failed (%s) — attempting 0x0.st fallback …", litter_exc
         )
 
     return _upload_to_0x0(path)
@@ -206,6 +220,68 @@ def _validate_url(url: str, host_label: str = "host") -> None:
         )
 
 
+def _upload_to_litterbox(path: Path, retries: int = 3) -> str:
+    """
+    Upload a file to Litterbox (Catbox temporary storage, 72h expiry).
+
+    Args:
+        path:    Resolved path to the local file.
+        retries: Number of attempts before raising.
+
+    Returns:
+        A public HTTPS URL string from litter.catbox.moe.
+
+    Raises:
+        UploadError: All attempts failed.
+    """
+    log.info("Uploading '%s' (%.2f MB) to Litterbox (72h) …", path.name, path.stat().st_size / 1_048_576)
+    t0 = time.monotonic()
+
+    last_exc: Exception = UploadError("No attempts made")
+
+    for attempt in range(1, retries + 1):
+        try:
+            with path.open("rb") as fh:
+                resp = requests.post(
+                    LITTERBOX_API_URL,
+                    data={"reqtype": "fileupload", "time": "72h"},
+                    files={"fileToUpload": (path.name, fh)},
+                    headers=_UPLOAD_HEADERS,
+                    timeout=_UPLOAD_TIMEOUT,
+                )
+
+            if resp.status_code != 200:
+                raise UploadError(
+                    f"Litterbox returned HTTP {resp.status_code}: {resp.text[:200]}"
+                )
+
+            url = resp.text.strip()
+            _validate_url(url, host_label="Litterbox")
+
+            elapsed = time.monotonic() - t0
+            log.info("Litterbox upload complete in %.1fs → %s", elapsed, url)
+            return url
+
+        except (UploadError, requests.RequestException) as exc:
+            last_exc = exc
+            if attempt < retries:
+                wait = _BACKOFF_BASE ** attempt
+                log.warning(
+                    "Litterbox upload attempt %d/%d failed (%s) — retrying in %ds …",
+                    attempt, retries, exc, wait,
+                )
+                time.sleep(wait)
+            else:
+                log.warning(
+                    "Litterbox upload attempt %d/%d failed (%s) — giving up.",
+                    attempt, retries, exc,
+                )
+
+    raise UploadError(
+        f"Litterbox upload failed after {retries} attempts: {last_exc}"
+    ) from last_exc
+
+
 def _upload_to_0x0(path: Path, retries: int = 3) -> str:
     """
     Upload a file to 0x0.st as a fallback.
@@ -231,6 +307,7 @@ def _upload_to_0x0(path: Path, retries: int = 3) -> str:
                 resp = requests.post(
                     ZX0_API_URL,
                     files={"file": (path.name, fh)},
+                    headers=_UPLOAD_HEADERS,
                     timeout=_UPLOAD_TIMEOUT,
                 )
 
