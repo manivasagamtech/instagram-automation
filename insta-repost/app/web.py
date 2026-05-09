@@ -24,6 +24,7 @@ from __future__ import annotations
 import os
 import secrets
 import shutil
+import threading
 import time
 import traceback
 from datetime import timedelta
@@ -169,20 +170,53 @@ def create_app(cfg=None) -> Flask:
 
         _DOWNLOADS_ROOT.mkdir(parents=True, exist_ok=True)
 
-        try:
-            result = download_from_url(url, _DOWNLOADS_ROOT)
-        except ValueError as exc:
-            flash(f"Invalid URL: {exc}", "error")
+        log.info("Starting download for URL: %s", url)
+
+        # Run download in a thread with 90-second timeout to prevent hanging
+        download_result = [None]
+        download_error = [None]
+        download_done = threading.Event()
+
+        def _do_download():
+            try:
+                download_result[0] = download_from_url(url, _DOWNLOADS_ROOT)
+            except Exception as exc:
+                download_error[0] = exc
+            finally:
+                download_done.set()
+
+        dl_thread = threading.Thread(target=_do_download, daemon=True)
+        dl_thread.start()
+        download_done.wait(timeout=90)
+
+        if not download_done.is_set():
+            log.error("Download TIMED OUT after 90s for URL: %s", url)
+            flash("Download timed out — Instagram may be blocking downloads from this server. Try a different post.", "error")
             return redirect(url_for("submit"))
-        except PostNotFoundError as exc:
-            flash(f"Post not found (private or deleted): {exc}", "error")
-            return redirect(url_for("submit"))
-        except RateLimitedError:
-            flash("Instagram is rate-limiting downloads. Try again in a few minutes.", "error")
-            return redirect(url_for("submit"))
-        except DownloaderError as exc:
-            log.error("Download failed:\n%s", traceback.format_exc())
+
+        if download_error[0] is not None:
+            exc = download_error[0]
+            if isinstance(exc, ValueError):
+                flash(f"Invalid URL: {exc}", "error")
+                return redirect(url_for("submit"))
+            if isinstance(exc, PostNotFoundError):
+                flash(f"Post not found (private or deleted): {exc}", "error")
+                return redirect(url_for("submit"))
+            if isinstance(exc, RateLimitedError):
+                flash("Instagram is rate-limiting downloads. Try again in a few minutes.", "error")
+                return redirect(url_for("submit"))
+            if isinstance(exc, DownloaderError):
+                log.error("Download failed:\n%s", traceback.format_exc())
+                flash(f"Download failed: {exc}", "error")
+                return redirect(url_for("submit"))
+            # Unknown error
+            log.error("Download failed with unexpected error:\n%s", exc)
             flash(f"Download failed: {exc}", "error")
+            return redirect(url_for("submit"))
+
+        result = download_result[0]
+        if result is None:
+            flash("Download returned no result. Please try again.", "error")
             return redirect(url_for("submit"))
 
         credit = f"\n\n🎥 Credits: @{result.source_user}" if result.source_user else ""
