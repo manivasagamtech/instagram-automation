@@ -49,8 +49,9 @@
 <div class="card mt-2">
   <h2>✏️ Caption</h2>
 
-  <form method="post" action="{{ url_for('submit_confirm') }}">
+  <form id="previewForm" method="post" action="{{ url_for('submit_confirm') }}">
     <input type="hidden" name="_csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" id="formAction" name="_action" value="queue">
 
     <label for="caption">
       Final caption
@@ -71,9 +72,24 @@
     </p>
 
     <div class="gap-1 mt-2">
-      <button type="submit" class="btn btn-success">✅ Queue it</button>
+      <button type="submit" id="postNowBtn" class="btn btn-primary"
+              style="background:#e11d48;border-color:#e11d48;">
+        🚀 Post Now
+      </button>
+      <button type="submit" class="btn btn-success">📋 Queue it</button>
       <a href="{{ url_for('submit') }}" class="btn btn-ghost">← Discard &amp; go back</a>
     </div>
   </form>
+
+  <script>
+    document.getElementById('postNowBtn').addEventListener('click', function(e) {
+      e.preventDefault();
+      var form = document.getElementById('previewForm');
+      form.action = "{{ url_for('submit_post_now') }}";
+      this.textContent = '🚀 Publishing to Instagram…';
+      this.disabled = true;
+      setTimeout(function() { form.submit(); }, 50);
+    });
+  </script>
 </div>
 {% endblock %}

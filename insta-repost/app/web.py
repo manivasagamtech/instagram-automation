@@ -57,6 +57,7 @@ from app.queue_client import (
     QueueError,
     STATUS_READY,
 )
+from app.publisher import PublisherError, _publish_row
 from app.uploader import FileTooLargeError, UploadError, upload_with_fallback
 
 log = get_logger(__name__)
@@ -103,6 +104,23 @@ def create_app(cfg=None) -> Flask:
             "csrf_token": _get_csrf_token,
             "status_badge": _status_badge,
         }
+
+    # Security headers to prevent Chrome "Dangerous" warning
+    @app.after_request
+    def _add_security_headers(response):
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data:; "
+            "media-src 'self'; "
+            "frame-ancestors 'none'"
+        )
+        return response
 
     # ── Routes ─────────────────────────────────────────────────────────────────
 
@@ -313,6 +331,91 @@ def create_app(cfg=None) -> Flask:
         log.info(
             "Queued shortcode '%s' at row %d (url=%s)",
             pending["shortcode"], row_idx, media_url,
+        )
+        return redirect(url_for("queue"))
+
+    # ── Post Now (direct publish) ────────────────────────────────────────────
+
+    @app.route("/submit/post-now", methods=["POST"])
+    @_require_auth
+    def submit_post_now():
+        """Upload media and publish directly to Instagram, skipping the queue."""
+        _validate_csrf()
+
+        pending = session.get("pending")
+        if not pending:
+            flash("Session expired. Please submit the URL again.", "error")
+            return redirect(url_for("submit"))
+
+        final_caption = request.form.get("caption", "").strip()
+        media_path    = Path(pending["media_path"])
+
+        if not media_path.exists():
+            flash("Downloaded file is missing. Please re-submit the URL.", "error")
+            session.pop("pending", None)
+            return redirect(url_for("submit"))
+
+        # Step 1: Upload to file host
+        try:
+            media_url = upload_with_fallback(media_path)
+        except FileTooLargeError as exc:
+            flash(f"File too large to upload: {exc}", "error")
+            return redirect(url_for("submit_preview"))
+        except UploadError as exc:
+            log.error("Upload failed:\n%s", traceback.format_exc())
+            flash(f"Upload failed: {exc}", "error")
+            return redirect(url_for("submit_preview"))
+
+        # Clean up local file
+        try:
+            shutil.rmtree(media_path.parent, ignore_errors=True)
+        except Exception:
+            pass
+
+        # Step 2: Publish directly to Instagram
+        cfg = app.config["BOT_CONFIG"]
+
+        from dataclasses import dataclass as _dc
+        from typing import Optional as _Opt
+
+        @_dc
+        class _DirectRow:
+            row_index: int = 0
+            shortcode: str = ""
+            media_url: str = ""
+            caption: str = ""
+            source_user: str = ""
+            media_type: str = "IMAGE"
+            status: str = "ready"
+            post_id: _Opt[str] = None
+
+        row = _DirectRow(
+            shortcode=pending["shortcode"],
+            media_url=media_url,
+            caption=final_caption,
+            source_user=pending.get("source_user", ""),
+            media_type=pending.get("media_type", "IMAGE"),
+        )
+
+        try:
+            post_id = _publish_row(row, cfg)
+        except PublisherError as exc:
+            log.error("Direct publish failed:\n%s", traceback.format_exc())
+            flash(f"Instagram publish failed: {exc}", "error")
+            return redirect(url_for("submit_preview"))
+        except Exception as exc:
+            log.error("Direct publish failed:\n%s", traceback.format_exc())
+            flash(f"Publish error: {exc}", "error")
+            return redirect(url_for("submit_preview"))
+
+        session.pop("pending", None)
+        flash(
+            f"🎉 Posted to Instagram! Post ID: {post_id}",
+            "success",
+        )
+        log.info(
+            "DIRECT PUBLISH: shortcode '%s' posted as IG post %s",
+            pending["shortcode"], post_id,
         )
         return redirect(url_for("queue"))
 
