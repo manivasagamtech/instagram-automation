@@ -28,14 +28,20 @@
       Accepted: <code>/p/</code>, <code>/reel/</code>, <code>/reels/</code>, <code>/tv/</code>
     </p>
 
-    <button id="submitBtn" type="submit" class="btn btn-primary btn-block mt-2"
-            onclick="document.querySelector('.spinner').style.display='inline-block';
-                     this.textContent=' Downloading…';
-                     this.disabled=true;">
+    <button id="submitBtn" type="submit" class="btn btn-primary btn-block mt-2">
       <span class="spinner"></span>
       Queue Post
     </button>
   </form>
+
+  <script>
+    document.getElementById('submitForm').addEventListener('submit', function() {
+      var btn = document.getElementById('submitBtn');
+      btn.textContent = ' Downloading…';
+      // Delay disable so the form actually submits first
+      setTimeout(function() { btn.disabled = true; }, 50);
+    });
+  </script>
 </div>
 
 <div class="card mt-2">
