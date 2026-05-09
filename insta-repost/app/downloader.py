@@ -17,6 +17,7 @@ import os
 import re
 import shutil
 import tempfile
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -293,11 +294,42 @@ def _get_instaloader_instance():
 
     try:
         _SESSIONS_DIR.mkdir(parents=True, exist_ok=True)
-        IL.login(username, password)
+        # Use a thread with timeout to prevent login from hanging indefinitely
+        # (Instagram may challenge new logins from server IPs)
+        login_error: list = []
+        login_done = threading.Event()
+
+        def _do_login():
+            try:
+                IL.login(username, password)
+            except Exception as exc:
+                login_error.append(exc)
+            finally:
+                login_done.set()
+
+        login_thread = threading.Thread(target=_do_login, daemon=True)
+        login_thread.start()
+        login_done.wait(timeout=30)  # 30 second max for login
+
+        if not login_done.is_set():
+            log.warning(
+                "Instagram login timed out after 30s for @%s — "
+                "Instagram may be challenging this login. Continuing anonymously.",
+                username,
+            )
+            return IL
+
+        if login_error:
+            exc = login_error[0]
+            if isinstance(exc, instaloader.exceptions.BadCredentialsException):  # type: ignore[union-attr]
+                raise DownloaderError(f"Instagram login failed for @{username}: {exc}") from exc
+            log.warning("Login failed (%s) — continuing anonymously.", exc)
+            return IL
+
         IL.save_session_to_file(str(session_file))
         log.info("Logged in to Instagram as @%s and cached session.", username)
-    except instaloader.exceptions.BadCredentialsException as exc:  # type: ignore[union-attr]
-        raise DownloaderError(f"Instagram login failed for @{username}: {exc}") from exc
+    except DownloaderError:
+        raise
     except Exception as exc:
         log.warning("Login failed (%s) — continuing anonymously.", exc)
 
